@@ -9,7 +9,7 @@ import numpy as np
 
 # This is to be understood as a transition: Given `state0`, performing `action`
 # yields `reward` and results in `state1`, which might be `terminal`.
-Experience = namedtuple('Experience', 'state0, action, reward, state1, terminal1')
+Experience = namedtuple("Experience", "state0, action, reward, state1, terminal1")
 
 
 def sample_batch_indexes(low, high, size):
@@ -28,7 +28,8 @@ def sample_batch_indexes(low, high, size):
         # can occur multiple times. This is not good and should be avoided by picking a
         # large enough warm-up phase.
         warnings.warn(
-            'Not enough entries to sample without replacement. Consider increasing your warm-up phase to avoid oversampling!')
+            "Not enough entries to sample without replacement. Consider increasing your warm-up phase to avoid oversampling!"
+        )
         batch_idxs = np.random.random_integers(low, high - 1, size=size)
     assert len(batch_idxs) == size
     return batch_idxs
@@ -63,15 +64,15 @@ class RingBuffer(object):
 
 
 def zeroed_observation(observation):
-    if hasattr(observation, 'shape'):
+    if hasattr(observation, "shape"):
         return np.zeros(observation.shape)
-    elif hasattr(observation, '__iter__'):
+    elif hasattr(observation, "__iter__"):
         out = []
         for x in observation:
             out.append(zeroed_observation(x))
         return out
     else:
-        return 0.
+        return 0.0
 
 
 class Memory(object):
@@ -97,8 +98,14 @@ class Memory(object):
         idx = len(self.recent_observations) - 1
         for offset in range(0, self.window_length - 1):
             current_idx = idx - offset
-            current_terminal = self.recent_terminals[current_idx - 1] if current_idx - 1 >= 0 else False
-            if current_idx < 0 or (not self.ignore_episode_boundaries and current_terminal):
+            current_terminal = (
+                self.recent_terminals[current_idx - 1]
+                if current_idx - 1 >= 0
+                else False
+            )
+            if current_idx < 0 or (
+                not self.ignore_episode_boundaries and current_terminal
+            ):
                 # The previously handled observation was terminal, don't add the current one.
                 # Otherwise we would leak into a different episode.
                 break
@@ -109,8 +116,8 @@ class Memory(object):
 
     def get_config(self):
         config = {
-            'window_length': self.window_length,
-            'ignore_episode_boundaries': self.ignore_episode_boundaries,
+            "window_length": self.window_length,
+            "ignore_episode_boundaries": self.ignore_episode_boundaries,
         }
         return config
 
@@ -156,8 +163,12 @@ class SequentialMemory(Memory):
             state0 = [self.observations[idx - 1]]
             for offset in range(0, self.window_length - 1):
                 current_idx = idx - 2 - offset
-                current_terminal = self.terminals[current_idx - 1] if current_idx - 1 > 0 else False
-                if current_idx < 0 or (not self.ignore_episode_boundaries and current_terminal):
+                current_terminal = (
+                    self.terminals[current_idx - 1] if current_idx - 1 > 0 else False
+                )
+                if current_idx < 0 or (
+                    not self.ignore_episode_boundaries and current_terminal
+                ):
                     # The previously handled observation was terminal, don't add the current one.
                     # Otherwise we would leak into a different episode.
                     break
@@ -176,8 +187,15 @@ class SequentialMemory(Memory):
 
             assert len(state0) == self.window_length
             assert len(state1) == len(state0)
-            experiences.append(Experience(state0=state0, action=action, reward=reward,
-                                          state1=state1, terminal1=terminal1))
+            experiences.append(
+                Experience(
+                    state0=state0,
+                    action=action,
+                    reward=reward,
+                    state1=state1,
+                    terminal1=terminal1,
+                )
+            )
         assert len(experiences) == batch_size
         return experiences
 
@@ -194,19 +212,21 @@ class SequentialMemory(Memory):
             state1_batch.append(e.state1)
             reward_batch.append(e.reward)
             action_batch.append(e.action)
-            terminal1_batch.append(0. if e.terminal1 else 1.)
+            terminal1_batch.append(0.0 if e.terminal1 else 1.0)
 
         # Prepare and validate parameters.
-        state0_batch = np.array(state0_batch, 'double').reshape(batch_size, -1)
-        state1_batch = np.array(state1_batch, 'double').reshape(batch_size, -1)
-        terminal1_batch = np.array(terminal1_batch, 'double').reshape(batch_size, -1)
-        reward_batch = np.array(reward_batch, 'double').reshape(batch_size, -1)
-        action_batch = np.array(action_batch, 'double').reshape(batch_size, -1)
+        state0_batch = np.array(state0_batch, "double").reshape(batch_size, -1)
+        state1_batch = np.array(state1_batch, "double").reshape(batch_size, -1)
+        terminal1_batch = np.array(terminal1_batch, "double").reshape(batch_size, -1)
+        reward_batch = np.array(reward_batch, "double").reshape(batch_size, -1)
+        action_batch = np.array(action_batch, "double").reshape(batch_size, -1)
 
         return state0_batch, action_batch, reward_batch, state1_batch, terminal1_batch
 
     def append(self, observation, action, reward, terminal, training=True):
-        super(SequentialMemory, self).append(observation, action, reward, terminal, training=training)
+        super(SequentialMemory, self).append(
+            observation, action, reward, terminal, training=training
+        )
 
         # This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
         # and weather the next state is `terminal` or not.
@@ -222,7 +242,7 @@ class SequentialMemory(Memory):
 
     def get_config(self):
         config = super(SequentialMemory, self).get_config()
-        config['limit'] = self.limit
+        config["limit"] = self.limit
         return config
 
 
@@ -248,7 +268,9 @@ class EpisodeParameterMemory(Memory):
         return batch_params, batch_total_rewards
 
     def append(self, observation, action, reward, terminal, training=True):
-        super(EpisodeParameterMemory, self).append(observation, action, reward, terminal, training=training)
+        super(EpisodeParameterMemory, self).append(
+            observation, action, reward, terminal, training=training
+        )
         if training:
             self.intermediate_rewards.append(reward)
 
@@ -264,5 +286,5 @@ class EpisodeParameterMemory(Memory):
 
     def get_config(self):
         config = super(SequentialMemory, self).get_config()
-        config['limit'] = self.limit
+        config["limit"] = self.limit
         return config
